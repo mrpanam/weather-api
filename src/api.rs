@@ -1,12 +1,10 @@
 
 use crate::model::{WeatherData, OpenMeteoResponse, Location, WeatherCode};
 use surrealdb_types::Datetime;
+use tokio::time::{sleep, Duration};
 
 
-pub async fn get_current_weather(location: Location) -> Result<WeatherData, reqwest::Error> {
-    
-
-
+pub async fn get_current_weather(location: Location) -> Result<WeatherData, Box<dyn std::error::Error + Send + Sync>> {
     let url = format!(
         "https://api.open-meteo.com/v1/forecast\
         ?latitude={}\
@@ -15,8 +13,40 @@ pub async fn get_current_weather(location: Location) -> Result<WeatherData, reqw
         location.lat, location.lon
     );
 
-    let response = reqwest::get(&url).await?;
-    let data: OpenMeteoResponse = response.json().await?;
+    let log_error = |msg: &str, error: &dyn std::error::Error| {
+        tracing::error!(
+            location = %location.name,
+            latitude = location.lat,
+            longitude = location.lon,
+            error = %error,
+            msg
+        );
+    };
+
+    let response = reqwest::get(&url).await.map_err(|e| {
+        log_error("Failed to fetch from OpenMeteo API", &e);
+        e
+    })?;
+
+    let text = response.text().await.map_err(|e| {
+        log_error("Failed to read response body from OpenMeteo API", &e);
+        e
+    })?;
+
+let data: OpenMeteoResponse = match serde_json::from_str(&text) {
+    Ok(d) => d,
+    Err(e) => {
+        tracing::error!(
+            location = %location.name,
+            latitude = location.lat,
+            longitude = location.lon,
+            api_response = %text,
+            error = %e,
+            "Failed to parse JSON from OpenMeteo API"
+        );
+        return Err(e.into());
+    }
+};
 
     Ok(WeatherData {
         location_name: location.name,
@@ -31,21 +61,13 @@ pub async fn get_current_weather(location: Location) -> Result<WeatherData, reqw
 
 pub async fn get_weather_for_locations(
     locations: Vec<Location>,
-) -> Vec<Result<WeatherData, reqwest::Error>> {
-    let handles: Vec<tokio::task::JoinHandle<Result<WeatherData, reqwest::Error>>> = locations
-        .into_iter()
-        .map(|loc| tokio::spawn(get_current_weather(loc)))
-        .collect();
-
+) -> Vec<Result<WeatherData, Box<dyn std::error::Error + Send + Sync>>> {
     let mut results = Vec::new();
-    for handle in handles {
-        match handle.await {
-            Ok(res) => results.push(res),
-            Err(_) => {
-                let err = reqwest::get("invalid://url").await.unwrap_err();
-                results.push(Err(err));
-            }
-        }
+    for loc in locations {
+        let result = get_current_weather(loc).await;
+        results.push(result);
+        // Add delay to avoid rate limiting (200ms between requests)
+        sleep(Duration::from_millis(200)).await;
     }
     results
 }

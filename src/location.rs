@@ -38,5 +38,26 @@ use crate::model;
             lat: 43.6045,
             lon: 1.4440,
         },
+        model::Location {
+            name: "Brest".to_string(),
+            lat: 48.3903,
+            lon: -4.4863,
+        },
+        model::Location {
+            name: "Marseille".to_string(),
+            lat: 43.2965,
+            lon: 5.3698,
+        },
+        model::Location {
+            name: "Lille".to_string(),
+            lat: 50.6292,
+            lon: 3.0573,
+        },
+        model::Location {
+            name: "Jersey".to_string(),
+            lat: 49.19,
+            lon: -2.10,
+        },
+
     ]
 }

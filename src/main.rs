@@ -9,7 +9,12 @@ mod postgres;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Hello, Open Meteo API!");
+    tracing_subscriber::fmt()
+        .json()
+        .with_target(false)
+        .init();
+
+    tracing::info!("Starting weather API");
     db::init_db().await?;
 
     let locations = location::get_locations();
@@ -20,10 +25,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for result in results {
         match result {
             Ok(weather) => {
+                tracing::info!(
+                    location = %weather.location_name,
+                    temperature = weather.temperature_2m,
+                    "Successfully fetched weather"
+                );
                 postgres::save_weather_pg(&weather).await?;
                 db::save_weather(weather).await?;
             }
-            Err(e) => eprintln!("Failed to fetch weather: {}", e),
+            Err(_) => {} // Error already logged in api.rs
         }
     }
 

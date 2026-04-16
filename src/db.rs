@@ -34,7 +34,16 @@ pub fn get_db() -> &'static Surreal<Any> {
 
 pub async fn save_weather(data: WeatherData) -> Result<(), Error> {
     let db = get_db();
+    let location = data.location_name.clone();
+    tracing::info!(
+        location = %location,
+        "Saving weather data to SurrealDB"
+    );
     let _: Option<WeatherData> = db.create("weather").content(data).await?;
+    tracing::info!(
+        location = %location,
+        "Successfully saved weather data to SurrealDB"
+    );
     Ok(())
 }
 
