@@ -7,8 +7,10 @@ use crate::model::WeatherData;
 pub static PG_POOL: OnceLock<PgPool> = OnceLock::new();
 
 pub async fn init_postgres(database_url: &str) -> Result<(), Error> {
+    tracing::info!("Connecting to PostgreSQL database");
     let pool = PgPool::connect(database_url).await?;
     PG_POOL.set(pool).expect("Failed to set PostgreSQL pool");
+    tracing::info!("Successfully connected to PostgreSQL database");
     Ok(())
 }
 
@@ -18,6 +20,11 @@ pub fn get_pg_pool() -> &'static PgPool {
 
 pub async fn save_weather_pg(data: &WeatherData) -> Result<(), Error> {
     let pool = get_pg_pool();
+    let location = data.location_name.clone();
+    tracing::info!(
+        location = %location,
+        "Saving weather data to PostgreSQL"
+    );
     
     sqlx::query(
         r#"
@@ -37,5 +44,9 @@ pub async fn save_weather_pg(data: &WeatherData) -> Result<(), Error> {
     .execute(pool)
     .await?;
     
+    tracing::info!(
+        location = %location,
+        "Successfully saved weather data to PostgreSQL"
+    );
     Ok(())
 }
